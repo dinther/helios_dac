@@ -1,7 +1,7 @@
 /*
 SDK for Helios Laser DAC class, SOURCE
-By Gitle Mikkelsen
-gitlem@gmail.com
+By Paul van Dinther
+based on the SDK from Gitle Mikkelsen
 
 Dependencies:
 WebUSB API
