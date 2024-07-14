@@ -46,12 +46,12 @@ export class HeliosPoint {
 
 export class HeliosDac {
     constructor() {
-        this.inited = false;
+        this.initialised = false;
         this.deviceList = [];
     }
 
     async openDevices() {
-        if (this.inited) return this.deviceList.length;
+        if (this.initialised) return this.deviceList.length;
 
         this.deviceList = [];
         try {
@@ -64,7 +64,7 @@ export class HeliosDac {
                     this.deviceList.push(new HeliosDacDevice(device));
                 }
             }
-            this.inited = true;
+            this.initialised = true;
             return this.deviceList.length;
         } catch (error) {
             console.error('Error opening devices:', error);
@@ -73,9 +73,9 @@ export class HeliosDac {
     }
 
     async closeDevices() {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
-        this.inited = false;
+        this.initialised = false;
         for (const device of this.deviceList) {
             await device.close();
         }
@@ -84,7 +84,7 @@ export class HeliosDac {
     }
 
     async writeFrame(devNum, pps, flags, points, numOfPoints) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
         if (!points || numOfPoints > HELIOS_MAX_POINTS || pps > HELIOS_MAX_RATE || pps < HELIOS_MIN_RATE) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
@@ -94,7 +94,7 @@ export class HeliosDac {
     }
 
     async getStatus(devNum) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
         if (!device) return HELIOS_ERROR;
@@ -103,7 +103,7 @@ export class HeliosDac {
     }
 
     async getFirmwareVersion(devNum) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
         if (!device) return HELIOS_ERROR;
@@ -112,7 +112,7 @@ export class HeliosDac {
     }
 
     async getName(devNum) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
         if (!device) return HELIOS_ERROR;
@@ -121,7 +121,7 @@ export class HeliosDac {
     }
 
     async setName(devNum, name) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
         if (!device) return HELIOS_ERROR;
@@ -130,7 +130,7 @@ export class HeliosDac {
     }
 
     async stop(devNum) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
         if (!device) return HELIOS_ERROR;
@@ -139,7 +139,7 @@ export class HeliosDac {
     }
 
     async setShutter(devNum, level) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
         if (!device) return HELIOS_ERROR;
@@ -148,7 +148,7 @@ export class HeliosDac {
     }
 
     async eraseFirmware(devNum) {
-        if (!this.inited) return HELIOS_ERROR;
+        if (!this.initialised) return HELIOS_ERROR;
 
         const device = this.deviceList[devNum];
         if (!device) return HELIOS_ERROR;
