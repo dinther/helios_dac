@@ -4,3 +4,9 @@ The Helios DAC from [Bitlasers](https://bitlasers.com/helios-laser-dac/) is a pr
 This means that my Beatline show laser software can drive the laser directly from the browser.
 
 Don't get excited, it's not working yet but I am confident it will get there.
+
+some of it work though. Try it here
+
+https://dinther.github.io/helios_dac.js/
+
+
