@@ -169,14 +169,7 @@
 			async function main() {
 				try {
 					const frames = await createFrames();
-					//heliosDacManager = await new Helios.HeliosDacManager();
-					//window.heliosDacManager = heliosDacManager;
-					//const numDevs = await heliosDacManager.openDevices();
-
-					//disconnectBtn.setAttribute("disabled", false);
-					//startBtn.setAttribute("disabled", false);
-
-					//await sendFrames(heliosDacManager.deviceList.length);
+					await sendFrames(heliosDacManager.deviceList.length);
 				} catch (error) {
 					console.log("An error occurred:", error);
 				}
