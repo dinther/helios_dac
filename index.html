@@ -7,14 +7,182 @@
 	</head>
 	<body>
 		<div id="container">
-			<button id="request-device">Request device</button>
-            <button id="disconnect">Disconnect</button>
-            <button id="start">Start</button>
+			<button id="connectBtn">Connect to Helios DAC's</button>
+            <button id="disconnectBtn" disabled>Disconnect All</button>
+			<button id="stopBtn">Stop</button>
             <div id="devicesList"></div>
 		</div>
 		<script type="module">           
-            import * as App from './app.js';
-            window.App = App;
+            import * as Helios from './helios_dac.js';
+
+			const NUM_FRAMES = 30;
+			const POINTS_PER_FRAME = 1000;
+			const MAX_CYCLES = 150;
+			const PPS = 30000;
+			const FLAGS = Helios.HELIOS_FLAGS_DEFAULT;
+			const WAIT_LIMIT = 512;
+
+			let devicesListElm;
+			let connectBtn;
+			let disconnectBtn;
+			let startBtn;
+			let stopBtn;
+			let heliosDacManager;
+
+
+			document.addEventListener('DOMContentLoaded', async () => {
+				devicesListElm = document.getElementById('devicesList');
+				connectBtn = document.getElementById('connectBtn');
+				disconnectBtn = document.getElementById('disconnectBtn');
+				stopBtn = document.getElementById('stopBtn');
+				heliosDacManager = new Helios.HeliosDacManager();
+				window.heliosDacManager = heliosDacManager;
+				connectBtn.addEventListener('click', async () => {
+					try{
+						let device = await navigator.usb.requestDevice({ filters: [{vendorId: Helios.HELIOS_VID, classCode: Helios.HELIOS_PID}]});
+						const numDevs = await heliosDacManager.openDevices();
+						if (numDevs == 0){
+							return;
+						}
+						if (numDevs == -1){
+							alert('Connection to the device failed. Is there another program connected already?');
+							return;
+						}						
+						for (let i=0; i<numDevs; i++){
+							devicesListElm.innerHTML += 'Connected to ' + heliosDacManager.deviceList[i].device.productName + ' by: ' + heliosDacManager.deviceList[i].device.manufacturerName + ' ['+i+']<br>';
+						}
+						disconnectBtn.disabled = false;
+						main();
+					} catch (error){
+						console.log('navigator.usb.requestDevice cancelled by user');
+					}
+				});
+
+				
+				disconnectBtn.onclick = async () => {
+					try{
+						await heliosDacManager.closeDevices()
+						devicesListElm.innerHTML += 'Disconnected/n';
+						disconnectBtn.disabled = true;
+					} catch (err){
+						console.log(err);
+					}
+
+				};
+
+				//  Automatic connecting to the USB devices is only possible when they have at least once been explicitly 
+				//  connected explicitly by the user. The browser tends to forget what has been given permission for
+				//  so I rather always get the user to connect. There is something creepy about a website doing this
+				//  automatically so I don't. But enable this code if you want that feature.
+				/*
+				const numDevs = await heliosDacManager.openDevices();
+				if (numDevs == 0){
+					return;
+				}
+				for (let i=0; i<numDevs; i++){
+					devicesListElm.innerHTML += 'Connected to Helios DAC ' + i + ' by:' + heliosDacManager.deviceList[i].device.manufacturerName + '<br>';
+				}
+				main();
+				*/
+			});
+
+			//  Generates a horizontal scan line moving from top to bottom
+			//  Alternating Outside inwards. No blanking
+			//  Helios DAC wants x,y values from 0 to 4995. zero is top left
+			async function createFrames_original() {
+				const frames = [];
+				for (let i = 0; i < NUM_FRAMES; i++) {
+					const frame = [];
+					const y = Math.floor(i * 0xFFF / NUM_FRAMES);
+					for (let j = 0; j < POINTS_PER_FRAME; j++) {
+						let x;
+						if (j < POINTS_PER_FRAME / 2) {
+							x = Math.floor(j * 0xFFF / (POINTS_PER_FRAME / 2));
+						} else {
+							x = 0xFFF - Math.floor((j - POINTS_PER_FRAME / 2) * 0xFFF / (POINTS_PER_FRAME / 2));
+						}
+						frame.push(new Helios.HeliosPoint(x, y, 0xD0, 0xFF, 0xD0, 0xFF));
+					}
+					frames.push(frame);
+				}
+				return frames;
+			}
+
+			//  Generates a horizontal scan line moving from top to bottom
+			//  In zig zag pattern with blanking no dwell
+			//  Helios DAC wants x,y values from 0 to 4995. zero is top left
+			async function createFrames() {
+				const frames = [];
+				const range = 4095;
+				const frameFactor = 1 / NUM_FRAMES;
+				const pointFactor = 1 / POINTS_PER_FRAME;
+				for (let i = 0; i < NUM_FRAMES; i++) {
+					const frame = [];
+					const y = Math.floor(i * frameFactor);
+					let odd = (i & 1 == 1);
+					for (let j = 0; j < POINTS_PER_FRAME; j++) {
+						let intensity = (j==POINTS_PER_FRAME)? 0: 255;
+						if (odd){  //  odd lines
+							let x = Math.floor(j * pointFactor);
+							const point = new Helios.HeliosPoint(x, y, 208, 255, 208, intensity);
+							frame.push(point);
+						} else {  // even lines
+							let x = range - Math.floor(j * pointFactor);
+							const point = new Helios.HeliosPoint(x, y, 208, 255, 208, intensity);
+							frame.push(point);
+						}
+					}
+				}
+				return frames;
+			}
+
+			async function waitForReadyStatus(devNum) {
+				//for (let k = 0; k < WAIT_LIMIT; k++) {
+					let result = await heliosDacManager.getStatus(devNum);
+					if (result === 1) {
+						return true;
+					}
+				//}
+				return false;
+			}
+
+			async function sendFrames(numDevs) {
+				let cycleCount = 0;
+				while (cycleCount < MAX_CYCLES) {
+					cycleCount++;
+					console.log(cycleCount);
+					for (let j = 0; j < numDevs; j++) {
+						const isReady = await waitForReadyStatus(j);
+						if (isReady) {
+							await heliosDacManager.writeFrame(j, PPS, FLAGS, frames[cycleCount % NUM_FRAMES], POINTS_PER_FRAME);
+						}
+					}
+				}
+				try{
+					await heliosDacManager.closeDevices();
+					console.log("Frames sent successfully and devices closed.");
+				} catch (error) {
+					console.log("An error occurred:", error);
+				}
+			}
+
+			async function main() {
+				try {
+					const frames = await createFrames();
+					//heliosDacManager = await new Helios.HeliosDacManager();
+					//window.heliosDacManager = heliosDacManager;
+					//const numDevs = await heliosDacManager.openDevices();
+
+					//disconnectBtn.setAttribute("disabled", false);
+					//startBtn.setAttribute("disabled", false);
+
+					//await sendFrames(heliosDacManager.deviceList.length);
+				} catch (error) {
+					console.log("An error occurred:", error);
+				}
+			}
+
+
 		</script>
 	</body>
 </html>
