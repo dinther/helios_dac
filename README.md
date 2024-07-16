@@ -7,6 +7,6 @@ Don't get excited, it's not working yet but I am confident it will get there.
 
 some of it work though. Try it here
 
-https://dinther.github.io/helios_dac.js/
+https://dinther.github.io/helios_dac/
 
 
