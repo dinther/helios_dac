@@ -10,6 +10,7 @@ Known issues:
 Start and Stop doesn't work right. there is a race condition I think.
 Intensity field doesn't work which means no blanking either.
 
+## Live demo
 https://dinther.github.io/helios_dac/
 
 
