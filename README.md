@@ -15,7 +15,7 @@ heliosDevice.onFrame = async (device)=>{
     let y = Math.floor(Date.now()%2000 / 2000 * 4095);
     for(let i=0; i<15; i++) frame.push(new HELIOS.HeliosPoint(0, y, 0, 0, 0));
     for(let i=0; i<256; i++) frame.push(new HELIOS.HeliosPoint(i*16, y, 255-i, i, 0));
-    await device.sendFrame(PPS, FLAGS, frame, frame.length);
+    await device.sendFrame(frame, 30000);
 };
 heliosDevice.connect();
 heliosDevice.play();
