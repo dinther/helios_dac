@@ -47,17 +47,19 @@ It is possible some ports don't work. This is due to webUSB respecting permissio
 Run regedit and fo to the folder shown below.
 Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\USB
 Right click on USB and select permissions. Set permissions as permissable as you can.
-(This might have been caused by zadig)
 
-Make sure only one Helios Laser DAC is plugged in
-Zadig 2.9
-Select options - and select List all devices
-In the dropdown select the Helios Laser DAC
-It is says WinUSB on the left of the arrow then we are all good.
-If that is not the case select WinUSB
-Click on the dropdown arrow of the button below and select
-"install driver" and click the button. This takes a few minutes.
-Do this for every Helios Laser DAC
+It is important that Helios Laser DAC uses the winUSB drivers and not the lubUSB drivers.
+You can check this with a free program called [Zadig 2.9](https://zadig.akeo.ie/)
+Make sure all your Helios Laser DAC's are is plugged in and no software is connected to the DAC.
+
+- Select options - and select List all devices
+- In the dropdown select the Helios Laser DAC
+- It is says WinUSB on the left of the arrow then we are all good.
+- If that is not the case select WinUSB
+- Click on the dropdown arrow of the button below and select
+- "install driver" and click the button. This takes a few minutes.
+
+**Do this for every Helios Laser DAC**
 
 ![image](https://github.com/user-attachments/assets/33503be4-0681-455f-b423-010080ccb1b2)
 
