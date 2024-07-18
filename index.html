@@ -23,6 +23,20 @@
 			let playBtn;
 			let stopBtn;
 
+			function easeOutBounce(x){
+				const n1 = 7.5625;
+				const d1 = 2.75;
+				if (x < 1 / d1) {
+					return n1 * x * x;
+				} else if (x < 2 / d1) {
+					return n1 * (x -= 1.5 / d1) * x + 0.75;
+				} else if (x < 2.5 / d1) {
+					return n1 * (x -= 2.25 / d1) * x + 0.9375;
+				} else {
+					return n1 * (x -= 2.625 / d1) * x + 0.984375;
+				}
+			}
+
 			console.log(colors);
 			async function getHeliosDevicesUI(){
 				statusLogElm.innerHTML = '';
@@ -32,9 +46,12 @@
 					heliosDevices.forEach( async (device, index)=>{
 						device.onFrame = async (device)=>{
 							let frame = [];
-							let y = Math.floor(Date.now()%8000 / 8000 * 4095);
-							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y, 0, 0, 0));
-							for(let i=0; i<256; i++) frame.push(new HeliosPoint(i*16, y, 255-i, (i<128)?i : 256-i, (i<200)? 0:(i-200)*4));	
+							let y = Math.floor(Date.now()%8000 / 8000 * 2048);
+							if (y > 1648){
+								y = Math.floor(1648 - easeOutBounce((y-1648)/400) * 1648);
+							}
+							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y+2048, 0, 0, 0));
+							for(let i=0; i<256; i++) frame.push(new HeliosPoint(i*16, y+2048, 255-i, (i<128)?i : 256-i, (i<200)? 0:(i-200)*4));	
 							await device.sendFrame(frame, 30000);
 						};
 						await device.connect();
