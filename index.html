@@ -12,35 +12,30 @@
 			<button id="playBtn" disabled>Play</button>
 			<button id="stopBtn" disabled>Stop</button>
             <div id="statusLogElm"></div>
+			<div id="colors"></div>
 		</div>
 		<script type="module">           
             import {HeliosPoint, connectHeliosDevice, getHeliosDevices, HeliosDevice} from './helios_dac.js';
-			const PPS = 35000;
 
 			let statusLogElm;
 			let connectBtn;
 			let disconnectBtn;
 			let playBtn;
 			let stopBtn;
-			let heliosDacManager;
-			let frames;
-			let stopAnimation = false;
 
+			console.log(colors);
 			async function getHeliosDevicesUI(){
 				statusLogElm.innerHTML = '';
 				let heliosDevices = [];
 				try{
-					heliosDevices = await getHeliosDevices();				
+					heliosDevices = await getHeliosDevices();		
 					heliosDevices.forEach( async (device, index)=>{
 						device.onFrame = async (device)=>{
-							console.log('start onFrame');
 							let frame = [];
-							let y = Math.floor(Date.now()%2000 / 2000 * 4095);
+							let y = Math.floor(Date.now()%8000 / 8000 * 4095);
 							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y, 0, 0, 0));
-							for(let i=0; i<256; i++) frame.push(new HeliosPoint(i*16, y, 255-i, i, 0));
-
-							await device.sendFrame(frame, PPS);
-							console.log('end onFrame');
+							for(let i=0; i<256; i++) frame.push(new HeliosPoint(i*16, y, 255-i, (i<128)?i : 256-i, (i<200)? 0:(i-200)*4));	
+							await device.sendFrame(frame, 30000);
 						};
 						await device.connect();
 						statusLogElm.innerHTML +=
@@ -53,7 +48,7 @@
 					disconnectBtn.disabled = false;
 					playBtn.disabled = false;
 				} catch (error){
-					console.log('navigator.usb.requestDevice cancelled by user');
+					console.log('getHeliosDevicesUI', error);
 				}
 				return heliosDevices;
 			}
@@ -66,10 +61,10 @@
 				stopBtn = document.getElementById('stopBtn');
 				connectBtn.addEventListener('click', async () => {
 					try{
-						await HELIOS.connectHeliosDevice();
-						heliosDevices = await getHeliosDevices();
+						await connectHeliosDevice();
+						heliosDevices = await getHeliosDevicesUI();
 					} catch (error){
-						console.log('navigator.usb.requestDevice cancelled by user');
+						console.log('connectHeliosDevice', error);
 					}
 				});
 
@@ -112,8 +107,8 @@
 					}
 				});
 
-				var heliosDevices = await getHeliosDevicesUI();
-				console.log(heliosDevices);
+				let heliosDevices = await getHeliosDevicesUI();
+				window.heliosDevices = heliosDevices;
 			});			
 		</script>
 	</body>
