@@ -105,11 +105,16 @@ export class HeliosDevice{
     }
 
     async connect() {
+        try{
         await this.usbDevice.open();
         await this.usbDevice.selectConfiguration(1);
         await this.usbDevice.claimInterface(0);
         await this.usbDevice.selectAlternateInterface(0,1);
         await this.init();
+        } catch(error){
+            console.error('Connect failed:', error);
+            return HELIOS_ERROR;
+        }
     }
 
     async init() {

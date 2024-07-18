@@ -40,20 +40,23 @@
 			async function getHeliosDevicesUI(){
 				statusLogElm.innerHTML = '';
 				let heliosDevices = [];
+				let c = 0;
 				try{
-					heliosDevices = await getHeliosDevices();		
+					heliosDevices = await getHeliosDevices();
+					window.heliosDevices = heliosDevices;		
 					heliosDevices.forEach( async (device, index)=>{
 						device.onFrame = (device)=>{
 							let frame = [];
 							let l = Date.now()%8000 / 8000;
-							let y = Math.floor(Date.now()%8000 / 8000 * 2048);
+							let y = Math.floor(l * 2048);
+							c += 0.001;
 							if (y > 1648){
 								y = Math.floor(1648 - easeOutBounce((y-1648)/400) * 1648);
 							}
 							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y+2048, 0, 0, 0));
 							for(let i=0; i<256; i++){
-								let color = hsvToRgb(i/256,1,1);
-							console.log(color);
+								let cf = i/128;
+								let color = hsvToRgb((cf+c)%1,1,1);
 								frame.push(new HeliosPoint(i*16, y+2048, color[0], color[1], color[2]));
 							}	
 							device.sendFrame(frame, 30000);
@@ -130,7 +133,6 @@
 				});
 
 				let heliosDevices = await getHeliosDevicesUI();
-				window.heliosDevices = heliosDevices;
 			});		
 			
 			function hsvToRgb(h, s, v) {

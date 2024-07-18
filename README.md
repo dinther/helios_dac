@@ -23,6 +23,22 @@ heliosDevice.play();
 
 Known issues:
 
+It is possible some ports don't work. This is due to webUSB respecting permission settings in the registry.
+Run regedit and fo to the folder shown below.
+Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\USB
+Right click on USB and select permissions. Set permissions as permissable as you can.
+(This might have been caused by zadig)
+
+Make sure only one Helios Laser DAC is plugged in
+Zadig 2.9
+Select options - and select List all devices
+In the dropdown select the Helios Laser DAC
+It is says WinUSB on the left of the arrow then we are all good.
+If that is not the case select WinUSB
+Click on the dropdown arrow of the button below and select
+"install driver" and click the button. This takes a few minutes.
+Do this for every Helios Laser DAC
+ 
 Start and Stop doesn't work right. there is a race condition I think.
 
 ## Live demo
