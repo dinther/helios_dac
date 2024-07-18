@@ -20,14 +20,14 @@ const HELIOS_SUCCESS = 1;  //  A valid test result
 const HELIOS_FAIL = 0;     //  A valid test result
 const HELIOS_ERROR = -1;   //  Abnormal fail
 
-export const HELIOS_FLAGS_DEFAULT = 0;
-export const HELIOS_FLAGS_START_IMMEDIATELY = (1 << 0);
-export const HELIOS_FLAGS_SINGLE_MODE = (1 << 1);
-export const HELIOS_FLAGS_DONT_BLOCK = (1 << 2);
+const HELIOS_FLAGS_DEFAULT = 0;
+const HELIOS_FLAGS_START_IMMEDIATELY = (1 << 0);
+const HELIOS_FLAGS_SINGLE_MODE = (1 << 1);
+//  export const HELIOS_FLAGS_DONT_BLOCK = (1 << 2); //not applicable to javascript. Everything is non blocking
 
 // USB properties
-export const HELIOS_VID = 0x1209;
-export const HELIOS_PID = 0xE500;
+const HELIOS_VID = 0x1209;
+const HELIOS_PID = 0xE500;
 
 const MAX_GET_STATUS_RETRIES = 512;
 
@@ -175,21 +175,28 @@ export class HeliosDevice{
         }
     }
 
-    async sendFrame(pps, flags, points, numOfPoints) {
-        if (this.closed || this.frameReady) return HELIOS_ERROR;
+    async sendFrame(points=null, pps=30000, singleShot=false, interuptFrame=false) {
+        if ( points == null ||
+             points.length > HELIOS_MAX_POINTS ||
+             pps > HELIOS_MAX_RATE ||
+             pps < HELIOS_MIN_RATE ||
+             this.closed ||
+             this.frameReady ) return HELIOS_ERROR;
 
         let bufPos = 0;
-        const _frameBuffer = new Uint8Array(numOfPoints * 7 + 5);
+        const _frameBuffer = new Uint8Array(points.length * 7 + 5);
 
         let ppsActual = pps;
-        let numOfPointsActual = numOfPoints;
-        if (((numOfPoints - 45) % 64) === 0) {
+        let numOfPointsActual = points.length;
+        if (((points.length - 45) % 64) === 0) {
             numOfPointsActual--;
             // adjust pps to keep the same frame duration even with one less point
-            ppsActual = Math.round(pps * (numOfPointsActual / numOfPoints));
+            ppsActual = Math.round(pps * (numOfPointsActual / points.length));
         }
-
-        for (let i = 0; i < numOfPoints; i++) {
+        let flags = HELIOS_FLAGS_DEFAULT;
+        if (singleShot) flags = flags|HELIOS_FLAGS_SINGLE_MODE;
+        if (interuptFrame) flags = flags|HELIOS_FLAGS_START_IMMEDIATELY;
+        for (let i = 0; i < points.length; i++) {
             _frameBuffer[bufPos++] = points[i].x >> 4;
             _frameBuffer[bufPos++] = ((points[i].x & 0x0F) << 4) | (points[i].y >> 8);
             _frameBuffer[bufPos++] = points[i].y & 0xFF;
