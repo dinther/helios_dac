@@ -32,7 +32,7 @@ export const HELIOS_PID = 0xE500;
 const MAX_GET_STATUS_RETRIES = 512;
 
 const EP_BULK_OUT = 0x02;
-const EP_BULK_IN = 0x81;  // this is a command response code?
+const EP_BULK_IN = 0x81;
 const EP_INT_OUT = 0x06;
 const EP_INT_IN = 0x03;
 
@@ -52,16 +52,34 @@ const HELIOS_GET_NAME_RESPONSE_CODE = 0x85;
 
 // Point data structure
 export class HeliosPoint {
-    constructor(x = 0, y = 0, r = 0, g = 0, b = 0, i = 0) {
+    constructor(x = 0, y = 0, r = 0, g = 0, b = 0, i) {
         this.x = x;
         this.y = y;
         this.r = r;
         this.g = g;
         this.b = b;
-        this.i = i;
+        this.i = (i===undefined)? (r|g|b==0)? 0 : 255 : i;
     }
 }
 
+export async function connectHeliosDevice(){
+    let usbDevice = await navigator.usb.requestDevice({ filters: [{vendorId: HELIOS_VID, classCode: HELIOS_PID}]});
+    return (usbDevice)? new HeliosDevice(usbDevice) : null;
+}
+
+export async function getHeliosDevices(){
+    let devices = await navigator.usb.getDevices();
+    let heliosDevices = [];
+    for (const usbDevice of devices) {
+        if (usbDevice.vendorId === HELIOS_VID && usbDevice.productId === HELIOS_PID) {
+            let dacDevice = new HeliosDevice(usbDevice);
+            heliosDevices.push(dacDevice);
+        }
+    }
+    return heliosDevices;
+}
+
+/*
 export class HeliosDacManager {
     constructor() {
         this.initialized = false;
@@ -104,109 +122,22 @@ export class HeliosDacManager {
         this.deviceList = [];
         return HELIOS_SUCCESS;
     }
-
-    
-    //  writes and outputs a frame to the speficied dac
-	//  devNum: dac number (0 to n where n+1 is the return value from OpenDevices() )
-	//    pps: rate of output in points per second
-	//    flags: default is HELIOS_FLAGS_DEFAULT (0) 
-	//    Bit 0 (LSB) = if 1, start output immediately, instead of waiting for current frame (if there is one) to finish playing
-	//	  Bit 1 = if 1, play frame only once, instead of repeating until another frame is written
-	//    Bit 2 = if 1, don't let WriteFrame() block execution while waiting for the transfer to finish 
-	//	  		(NB: then the function might return 1 even if it fails)
-	//	  Bit 3-7 = reserved
-	//  points: BufferArray cintaining point data. See HeliosPoint class declaration earlier in this document
-	//  numOfPoints: number of points in the frame
-    async writeFrame(devNum, pps, flags, points, numOfPoints) {
-        if (!this.initialized) return HELIOS_ERROR;
-        if (!points || numOfPoints > HELIOS_MAX_POINTS || pps > HELIOS_MAX_RATE || pps < HELIOS_MIN_RATE) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.sendFrame(pps, flags, points, numOfPoints);
-    }
-
-    //  Gets status of DAC, true means DAC is ready to receive frame, false means it is not
-    async getStatus(devNum) {
-        if (!this.initialized) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.getStatus();
-    }
-
-    //  Returns firmware version of DAC
-    async getFirmwareVersion(devNum) {
-        if (!this.initialized) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.getFirmwareVersion();
-    }
-
-    //  Gets name of DAC (populates name with max 32 characters)
-    async getName(devNum) {
-        if (!this.initialized) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.getName();
-    }
-
-    //  Sets name of DAC (name must be max 31 characters incl. null terminator)
-    async setName(devNum, name) {
-        if (!this.initialized) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.setName(name);
-    }
-
-    //  Stops output of DAC until new frame is written (NB: blocks for 100ms)
-    async stop(devNum) {
-        if (!this.initialized) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.stop();
-    }
-
-    //  Sets shutter level of DAC
-    async setShutter(devNum, level) {
-        if (!this.initialized) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.setShutter(level);
-    }
-
-    //  Erase the firmware of the DAC, allowing it to be updated by accessing the SAM-BA bootloader
-    async eraseFirmware(devNum) {
-        if (!this.initialized) return HELIOS_ERROR;
-
-        const device = this.deviceList[devNum];
-        if (!device) return HELIOS_ERROR;
-
-        return await device.eraseFirmware();
-    }
 }
+    */
 
-export class HeliosDacDevice {
-    constructor(device) {
-        this.device = device;
+export class HeliosDevice{
+    #running = false;
+    #firmwareVersion;
+    #name;
+    constructor(usbDevice) {
+        this.usbDevice = usbDevice;
         this.frameReady = false;
         this.closed = true;
-        this.firmwareVersion = 0;
-        this.name = '';
+        this.#firmwareVersion = 0;
+        this.#name = '';
         this.frameBuffer = new ArrayBuffer(HELIOS_MAX_POINTS * 7 + 5);
-        this.init();
+        this.onFrame = null;
+        //this.init();
     }
 
     #DataViewToString(dataView, offset=1){
@@ -218,17 +149,26 @@ export class HeliosDacDevice {
         }
     }
 
+    async connect() {
+        await this.usbDevice.open();
+        await this.usbDevice.selectConfiguration(1);
+        await this.usbDevice.claimInterface(0);
+        await this.usbDevice.selectAlternateInterface(0,1);
+        await this.init();
+    }
+
     async init() {
-        await this.getFirmwareVersion();
-        await this.getName();
         this.closed = false;
-        this.frameHandler();
+        await this.#getFirmwareVersion();
+        await this.#getName();
+        //this.frameHandler();
+        //this.handleRunning(); 
     }
 
     async sendControl(buffer, receiveLength){
         try {
-            await this.device.transferOut(EP_INT_OUT, buffer);
-            return await this.device.transferIn(EP_INT_IN, receiveLength);
+            await this.usbDevice.transferOut(EP_INT_OUT, buffer);
+            return await this.usbDevice.transferIn(EP_INT_IN, receiveLength);
         } catch (error) {
             console.error('Error getting status:', error);
             return HELIOS_ERROR;
@@ -264,19 +204,19 @@ export class HeliosDacDevice {
         _frameBuffer[bufPos++] = numOfPointsActual >> 8;
         _frameBuffer[bufPos++] = flags;
 
-        if (flags & HELIOS_FLAGS_DONT_BLOCK) {
-            this.frameReady = true;
-            return HELIOS_SUCCESS;
-        } else {
-            return await this.doFrame(_frameBuffer);
-        }
+        //if (flags & HELIOS_FLAGS_DONT_BLOCK) {
+        //    this.frameReady = true;
+         //   return HELIOS_SUCCESS;
+        //} else {
+        return await this.doFrame(_frameBuffer);
+        //}
     }
 
     async doFrame(_frameBuffer) {
         if (this.closed) return HELIOS_ERROR;
 
         try {
-            await this.device.transferOut(2, _frameBuffer);
+            await this.usbDevice.transferOut(EP_BULK_OUT, _frameBuffer);
             return HELIOS_SUCCESS;
         } catch (error) {
             console.error('Error sending frame:', error);
@@ -284,6 +224,7 @@ export class HeliosDacDevice {
         }
     }
 
+    /*
     async frameHandler() {
         while (!this.closed) {
             if (this.frameReady) {
@@ -293,11 +234,28 @@ export class HeliosDacDevice {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
     }
+*/
 
-    async getFirmwareVersion() {
-    	//catch any lingering transfers
-	    //std::uint8_t ctrlBuffer0[32];
-	    //while (libusb_interrupt_transfer(usbHandle, EP_INT_IN, ctrlBuffer0, 32, &actualLength, 5) == LIBUSB_SUCCESS);
+    async #playloop(){        
+        this.#running = true;
+        console.log('start playloop');
+        while(!this.closed && this.#running){
+            console.log('before getStatus');
+            let ready = await this.getStatus();
+            console.log('after getStatus');
+            if (ready){
+                if (this.onFrame){
+                    console.log('before onFrame');
+                    await this.onFrame(this);
+                    console.log('after onFrame');
+                }
+            }
+        }
+        console.log('stop playloop');
+    }
+
+    async #getFirmwareVersion() {
+    	if (this.closed) return HELIOS_ERROR;
         let retry = 3;
         
         const buffer = new Uint8Array(2);
@@ -307,8 +265,8 @@ export class HeliosDacDevice {
             while(retry > 0){
                 const result = await this.sendControl(buffer,2);
                 if (result.status=='ok'&& result.data && result.data.byteLength >= 2 && result.data.getUint8(0) === HELIOS_FIRMWARE_VERSION_RESPONSE_CODE){
-                    this.firmwareVersion = result.data.getUint8(1);
-                    return this.firmwareVersion;
+                    this.#firmwareVersion = result.data.getUint8(1);
+                    return this.#firmwareVersion;
                 }
                 retry--;
             }
@@ -319,7 +277,7 @@ export class HeliosDacDevice {
         }
     }
 
-    async getName() {
+    async #getName() {
         if (this.closed) return HELIOS_ERROR;
 
         try {
@@ -329,8 +287,8 @@ export class HeliosDacDevice {
             let retry = 3;
             while(retry > 0){
                 const result = await this.sendControl(buffer,32);
-                if (result.status=='ok' && result.data && result.data.byteLength >= 2 && result.data.getUint8(0) === HELIOS_GET_NAME_RESPONSE_CODE){
-                    this.name = this.#DataViewToString(result.data, 1);
+                if (result.status=='ok' && result.data && result.data.byteLength >= 3 && result.data.getUint8(0) === HELIOS_GET_NAME_RESPONSE_CODE){
+                    this.#name = this.#DataViewToString(result.data, 1);
                     return this.name;
                 }
                 retry--;
@@ -342,7 +300,7 @@ export class HeliosDacDevice {
         }
     }
 
-    async setName(name) {
+    async #setName(name) {
         if (this.closed) return HELIOS_ERROR;
 
         try {
@@ -409,7 +367,14 @@ export class HeliosDacDevice {
         }
     }
 
+    async start(){
+        if (this.closed) return HELIOS_ERROR;
+        this.#playloop();
+         
+    }
+
     async stop() {
+        this.#running = false;
         if (this.closed) return HELIOS_ERROR;
         const buffer = new Uint8Array(2);
         buffer[0] = HELIOS_STOP_COMMAND;
@@ -459,10 +424,30 @@ export class HeliosDacDevice {
 
         try {
             await this.stop();
-            await this.device.close();
+            await this.usbDevice.close();
             this.closed = true;
         } catch (error) {
             console.error('Error closing device:', error);
         }
+    }
+
+    get name(){
+        return this.#name;
+    }
+
+    set name(value){
+        this.#setName(value);
+    }
+
+    get firmwareVersion(){
+        return this.#firmwareVersion;
+    }
+
+    get manufacturerName(){
+        return this.usbDevice.manufacturerName;
+    }
+
+    get productName(){
+        return this.usbDevice.productName;
     }
 }

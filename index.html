@@ -7,20 +7,58 @@
 	</head>
 	<body>
 		<div id="container">
-			<button id="connectBtn">Connect to Helios DAC's</button>
+			<button id="connectBtn">Connect Helios Laser DAC</button>
             <button id="disconnectBtn" disabled>Disconnect All</button>
 			<button id="playBtn" disabled>Play</button>
 			<button id="stopBtn" disabled>Stop</button>
             <div id="statusLogElm"></div>
 		</div>
 		<script type="module">           
-            import * as HELIOS from './helios_dac.js';
-
-			const NUM_FRAMES = 500;
-			const POINTS_PER_FRAME = 100;
-			const PPS = 30000;
+            import * as Helios from './helios_dac.js';
+			var HELIOS = Helios;
+			window.HELIOS = HELIOS;
+			const POINTS_PER_FRAME = 400;
+			const PPS = 35000;
 			const FLAGS = HELIOS.HELIOS_FLAGS_DEFAULT;
 			const MAX_GET_STATUS_RETRIES = 512;
+
+			class ScanLine {
+				#duration;
+				#startDwell;
+				#endDwell;
+				#totalPoints;
+				#odd = false;
+				constructor(duration=2000, totalPoints=500, startDwell=15, endDwell=15){
+					this.#duration = duration;
+					this.#totalPoints = totalPoints;
+					this.#startDwell = startDwell;
+					this.#endDwell = endDwell;
+				}
+				getFrame(timeStamp){
+					let f = timeStamp%this.#duration / this.#duration;
+					this.#odd = !this.#odd;
+					let y = Math.floor(f * 4095);
+					let frame = [];
+					for (let db = 0; db < this.#startDwell; db++) {
+						let x = this.#odd? 4095 : 0;
+						let point = new HELIOS.HeliosPoint(x, y, 0, 0, 0);
+						frame.push(point);
+					}
+					let totalPoints = this.#totalPoints - this.#startDwell - this.#endDwell;
+					for (let j = 0; j < totalPoints; j++) {
+							let x = j/this.#totalPoints*4095;
+							x = this.#odd? 4095 - x : x;
+							const point = new HELIOS.HeliosPoint(x, y, Math.floor(timeStamp*1.2%255), Math.floor(timeStamp%255), Math.floor(timeStamp*1.7%255));
+							frame.push(point);
+					}
+					for (let da = 0; da < this.#endDwell; da++) {
+						let x = this.#odd? 4095 : 0;
+						let point = new HELIOS.HeliosPoint(x, y, 0, 0, 0, 0);
+						frame.push(point);
+					}
+					return frame;
+				}
+			}
 
 			let statusLogElm;
 			let connectBtn;
@@ -30,7 +68,40 @@
 			let heliosDacManager;
 			let frames;
 			let stopAnimation = false;
+			let scanLine = new ScanLine(2000, 500, 5, 5);
 
+			async function getHeliosDevices(){
+				statusLogElm.innerHTML = '';
+				let heliosDevices = [];
+				try{
+					heliosDevices = await HELIOS.getHeliosDevices();				
+					heliosDevices.forEach( async (device, index)=>{
+						device.onFrame = async (device)=>{
+							console.log('start onFrame');
+							//let frame = scanLine.getFrame(Date.now()); 
+
+							let frame = [];
+							for(let i=0; i<15; i++) frame.push(new HELIOS.HeliosPoint(0, 2048, 0, 0, 0));
+							for(let i=0; i<256; i++) frame.push(new HELIOS.HeliosPoint(i*16, 2048, 255-i, i, 0));
+
+							await device.sendFrame(PPS, FLAGS, frame, frame.length);
+							console.log('end onFrame');
+						};
+						await device.connect();
+						statusLogElm.innerHTML +=
+							'Device [' + index + ' - ' + device.name +'] ' +
+							'Connected to: ' + device.productName +
+							' manufacturer: ' + device.manufacturerName +
+							' firmware version: ' + device.firmwareVersion +
+							'<br>';
+					});
+					disconnectBtn.disabled = false;
+					playBtn.disabled = false;
+				} catch (error){
+					console.log('navigator.usb.requestDevice cancelled by user');
+				}
+				return heliosDevices;
+			}
 
 			document.addEventListener('DOMContentLoaded', async () => {
 				statusLogElm = document.getElementById('statusLogElm');
@@ -38,65 +109,33 @@
 				disconnectBtn = document.getElementById('disconnectBtn');
 				playBtn = document.getElementById('playBtn');
 				stopBtn = document.getElementById('stopBtn');
-				heliosDacManager = new HELIOS.HeliosDacManager();
-				window.heliosDacManager = heliosDacManager; // makes variable accessible in console for debug purposes
 				connectBtn.addEventListener('click', async () => {
 					try{
-						let device = await navigator.usb.requestDevice({ filters: [{vendorId: HELIOS.HELIOS_VID, classCode: HELIOS.HELIOS_PID}]});
-						const numDevs = await heliosDacManager.openDevices();
-						if (numDevs == 0){
-							return;
-						}
-						if (numDevs == -1){
-							alert('Connection to the device failed. Is there another program connected already?');
-							return;
-						}						
-						for (let i=0; i<numDevs; i++){
-							statusLogElm.innerHTML +=
-								'Device [' + i + ' - ' + heliosDacManager.deviceList[i].name +'] ' +
-								'Connected to: ' + heliosDacManager.deviceList[i].device.productName +
-								' manufacturer: ' + heliosDacManager.deviceList[i].device.manufacturerName +
-								' firmware version: ' + heliosDacManager.deviceList[i].firmwareVersion +
-								'<br>';
-						}
-
-						disconnectBtn.disabled = false;
-						playBtn.disabled = false;
+						await HELIOS.connectHeliosDevice();
+						heliosDevices = await getHeliosDevices();
 					} catch (error){
 						console.log('navigator.usb.requestDevice cancelled by user');
 					}
 				});
 
 				playBtn.addEventListener('click', async () => {
-					try{
-						stopAnimation = false;
-						stopBtn.disabled = false;
-						statusLogElm.innerHTML += 'Playing content<br>';
-						await sendFrames(heliosDacManager.deviceList.length);
-						if (stopAnimation){
-							statusLogElm.innerHTML += 'Stopped sending frames.<br>';
-						}
-						statusLogElm.innerHTML += 'Playback finished<br>';
-						try{
-							for (let j = 0; j < heliosDacManager.deviceList.length; j++) {
-								heliosDacManager.stop(j);
-								//console.log('stop', result);
-							}
-						} catch(err){
-							consolelog*(err);
-						}
-						statusLogElm.innerHTML += 'Stopped devices.<br>';
-					} catch (error) {
-						console.log("An error occurred:", error);
-					}
+					heliosDevices.forEach( async (device, index)=>{
+						device.start();
+					});
+					statusLogElm.innerHTML += 'Starting devices.<br>';
+					playBtn.disabled = true;
+					stopBtn.disabled = false;
 				});
 
 				//  Stops animation cycle
 				stopBtn.addEventListener('click', async () => {
 					try{
-						stopAnimation = true;
-						statusLogElm.innerHTML += 'Stopping sending frames.<br>';
+						heliosDevices.forEach( async (device, index)=>{
+							device.stop();
+						});
+						statusLogElm.innerHTML += 'Stopping devices.<br>';
 						stopBtn.disabled = true;
+						playBtn.disabled = false;
 					} catch (err){
 						console.log(err);
 					}					
@@ -104,7 +143,10 @@
 				
 				disconnectBtn.addEventListener('click', async () => {
 					try{
-						await heliosDacManager.closeDevices();
+						//await heliosDacManager.closeDevices();
+						for (let j = 0; j < heliosDevices.length; j++) {
+							await heliosDevices[j].close();
+						}
 						console.log("Devices closed.");
 						statusLogElm.innerHTML += 'All devices disconnected<br>';
 						stopBtn.disabled = true;
@@ -115,26 +157,15 @@
 					}
 				});
 
-				//  Automatic connecting to the USB devices is only possible when they have at least once been explicitly 
-				//  connected explicitly by the user. The browser tends to forget what has been given permission for
-				//  so I rather always get the user to connect. There is something creepy about a website doing this
-				//  automatically so I don't. But enable this code if you want that feature.
-				/*
-				const numDevs = await heliosDacManager.openDevices();
-				if (numDevs == 0){
-					return;
-				}
-				for (let i=0; i<numDevs; i++){
-					statusLogElm.innerHTML += 'Connected to ' + heliosDacManager.deviceList[i].device.productName + ' manufacturer: ' + heliosDacManager.deviceList[i].device.manufacturerName + ' ['+i+']<br>';
-				}
-				main();
-				*/
+				var heliosDevices = await getHeliosDevices();
+				console.log(heliosDevices);
 			});
 
 			var bouncingLine = function (timestamp, dataObject) {
-				let r = 15;
+				let r = 30;
 				let hr = r/2;
 				if (dataObject.startX === undefined){
+					dataObject.dwell = 15;
 					dataObject.startX = Math.random()*4095;
 					dataObject.startY = Math.random()*4095;
 					dataObject.endX = Math.random()*4095;
@@ -143,9 +174,9 @@
 					dataObject.deltaStartY = Math.random()*r, hr;
 					dataObject.deltaEndX = Math.random()*r, hr;
 					dataObject.deltaEndY = Math.random()*r, hr;
-					dataObject.r = Math.floor(Math.random()*255);
-					dataObject.g = Math.floor(Math.random()*255);
-					dataObject.b = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 				// move a bit
 				dataObject.startX += dataObject.deltaStartX;
@@ -155,85 +186,68 @@
 
 				if(dataObject.startX < 0) {
 					dataObject.deltaStartX = Math.random()*hr;
-					dataObject.r = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 				if(dataObject.startX > 4095){
 					dataObject.deltaStartX = Math.random()*-hr
-					dataObject.g = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 				if(dataObject.startY < 0){
 					dataObject.deltaStartY = Math.random()*hr;
-					dataObject.b = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 				if(dataObject.startY > 4095){
 					dataObject.deltaStartY = Math.random()*-hr;
-					dataObject.r = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 				if(dataObject.endX < 0){
 					dataObject.deltaEndX = Math.random()*hr;
-					dataObject.g = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 				if(dataObject.endX > 4095){
 					dataObject.deltaEndX = Math.random()*-hr;
-					dataObject.b = Math.floor(Math.random()*255);
+					dataObject.b = Math.random()*255;
 				}
 				if(dataObject.endY < 0){
 					dataObject.deltaEndY = Math.random()*hr;
-					dataObject.r = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 				if(dataObject.endY > 4095){
 					dataObject.deltaEndY = Math.random()*-hr;
-					dataObject.g = Math.floor(Math.random()*255);
+					dataObject.r = Math.random()*255;
+					dataObject.g = Math.random()*255;
+					dataObject.b = Math.random()*255;
 				}
 
 				let dx = (dataObject.endX - dataObject.startX)/POINTS_PER_FRAME;
 				let dy = (dataObject.endY - dataObject.startY)/POINTS_PER_FRAME;
 				let frame = [];
-				for (let j = 0; j < POINTS_PER_FRAME; j++) {
-					let intensity = (j==0)? 0: 255;  //  blank first point
-					let point = new HELIOS.HeliosPoint(Math.floor(dataObject.startX + (dx*j)), Math.floor(dataObject.startY+(dy*j)), dataObject.r, dataObject.g, dataObject.b, intensity);
+				let totalPoints = POINTS_PER_FRAME - dataObject.dwell - dataObject.dwell;
+				for (let db = 0; db < dataObject.dwell; db++) {
+					let point = new HELIOS.HeliosPoint(Math.floor(dataObject.startX), Math.floor(dataObject.startY), 0, 0, 0);
 					frame.push(point);
 				}
-					return frame;
-			}
-			window.bouncingLine = bouncingLine;
-
-			//  Generates a horizontal scanline moving at exactly 1 second from bottom to top
-			function line(timeStamp, dataObject){
-				if (dataObject.index === undefined) dataObject.index = 0;
-				let duration = 2000; // in milliseconds
-				let f = timeStamp%duration / duration;
-				let odd = (dataObject.index  & 1 == 1);
-				let y = Math.floor(f * 4095);
-				let frame = [];
-				for (let j = 0; j < POINTS_PER_FRAME; j++) {
-						let intensity = (j==0)? 0: 255;  //  blank first point
-						let x = j/POINTS_PER_FRAME*4095;
-						if (odd){  //  odd lines
-							x = 4095 - x;
-						}
-						const point = new HELIOS.HeliosPoint(x, y, Math.floor(timeStamp*1.2%255), Math.floor(timeStamp%255), Math.floor(timeStamp*1.7%255), intensity);
-						frame.push(point);
-					}
-				return frame;
-			}
-			window.line = line;
-
-			var getFrame = bouncingLine;
-			window.getFrame = getFrame;
-
-			async function sendFrames(numDevs) {
-				let dataObject = {};
-				while (true) {
-					if (stopAnimation) break;
-					for (let j = 0; j < numDevs; j++) {
-						const isReady = await heliosDacManager.getStatus(j);
-						if (isReady && !stopAnimation) {
-							let frame = getFrame(Date.now(),dataObject);
-							await heliosDacManager.writeFrame(j, PPS, FLAGS, frame, POINTS_PER_FRAME);
-						}
-					}
+				for (let j = 0; j < totalPoints; j++) {
+					let point = new HELIOS.HeliosPoint(Math.floor(dataObject.startX + (dx*j)), Math.floor(dataObject.startY+(dy*j)), Math.floor(dataObject.r), Math.floor(dataObject.g), Math.floor(dataObject.b));
+					frame.push(point);
 				}
+				for (let da = 0; da < dataObject.dwell; da++) {
+					let point = new HELIOS.HeliosPoint(Math.floor(dataObject.endX), Math.floor(dataObject.endY), 0, 0, 0);
+					frame.push(point);
+				}
+				return frame;
 			}
 		</script>
 	</body>
