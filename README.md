@@ -41,7 +41,18 @@ function connect(){
 }
 ```
 
+Send the same point buffer to all lasers if If you want all lasers to run perfectly in sync
+```javascript
+            ...
+            heliosDevices.forEach( async (device, index)=>{
+                device.sendFrame(frame, 30000);
+            });
+            ...
+```
+
 Known issues:
+
+Error handling is still a mess.
 
 It is possible some ports don't work. This is due to webUSB respecting permission settings in the registry.
 Run regedit and fo to the folder shown below.
