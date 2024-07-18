@@ -37,7 +37,6 @@
 				}
 			}
 
-			console.log(colors);
 			async function getHeliosDevicesUI(){
 				statusLogElm.innerHTML = '';
 				let heliosDevices = [];
@@ -46,12 +45,17 @@
 					heliosDevices.forEach( async (device, index)=>{
 						device.onFrame = (device)=>{
 							let frame = [];
+							let l = Date.now()%8000 / 8000;
 							let y = Math.floor(Date.now()%8000 / 8000 * 2048);
 							if (y > 1648){
 								y = Math.floor(1648 - easeOutBounce((y-1648)/400) * 1648);
 							}
 							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y+2048, 0, 0, 0));
-							for(let i=0; i<256; i++) frame.push(new HeliosPoint(i*16, y+2048, 255-i, (i<128)?i : 256-i, (i<200)? 0:(i-200)*4));	
+							for(let i=0; i<256; i++){
+								let color = hsvToRgb(i/256,1,1);
+							console.log(color);
+								frame.push(new HeliosPoint(i*16, y+2048, color[0], color[1], color[2]));
+							}	
 							device.sendFrame(frame, 30000);
 						};
 						await device.connect();
@@ -86,10 +90,11 @@
 				});
 
 				playBtn.addEventListener('click', async () => {
+					statusLogElm.innerHTML += 'Starting devices....';
 					heliosDevices.forEach( async (device, index)=>{
 						device.start();
 					});
-					statusLogElm.innerHTML += 'Starting devices.<br>';
+					statusLogElm.innerHTML += 'started<br>';
 					playBtn.disabled = true;
 					stopBtn.disabled = false;
 				});
@@ -97,10 +102,11 @@
 				//  Stops animation cycle
 				stopBtn.addEventListener('click', async () => {
 					try{
+						statusLogElm.innerHTML += 'Stopping devices....';
 						heliosDevices.forEach( async (device, index)=>{
 							device.stop();
 						});
-						statusLogElm.innerHTML += 'Stopping devices.<br>';
+						statusLogElm.innerHTML += 'Stopped.<br>';
 						stopBtn.disabled = true;
 						playBtn.disabled = false;
 					} catch (err){
@@ -110,12 +116,11 @@
 				
 				disconnectBtn.addEventListener('click', async () => {
 					try{
-						//await heliosDacManager.closeDevices();
+						statusLogElm.innerHTML += 'Closing devices....';
 						for (let j = 0; j < heliosDevices.length; j++) {
 							await heliosDevices[j].close();
 						}
-						console.log("Devices closed.");
-						statusLogElm.innerHTML += 'All devices disconnected<br>';
+						statusLogElm.innerHTML += 'closed<br>';
 						stopBtn.disabled = true;
 						disconnectBtn.disabled = true;
 						playBtn.disabled = true;
@@ -126,7 +131,28 @@
 
 				let heliosDevices = await getHeliosDevicesUI();
 				window.heliosDevices = heliosDevices;
-			});			
+			});		
+			
+			function hsvToRgb(h, s, v) {
+				var r, g, b;
+
+				var i = Math.floor(h * 6);
+				var f = h * 6 - i;
+				var p = v * (1 - s);
+				var q = v * (1 - f * s);
+				var t = v * (1 - (1 - f) * s);
+
+				switch (i % 6) {
+					case 0: r = v, g = t, b = p; break;
+					case 1: r = q, g = v, b = p; break;
+					case 2: r = p, g = v, b = t; break;
+					case 3: r = p, g = q, b = v; break;
+					case 4: r = t, g = p, b = v; break;
+					case 5: r = v, g = p, b = q; break;
+				}
+
+				return [ Math.floor(r * 255), Math.floor(g * 255), Math.floor( b * 255) ];
+				}
 		</script>
 	</body>
 </html>
