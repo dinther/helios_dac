@@ -44,7 +44,7 @@
 				try{
 					heliosDevices = await getHeliosDevices();		
 					heliosDevices.forEach( async (device, index)=>{
-						device.onFrame = async (device)=>{
+						device.onFrame = (device)=>{
 							let frame = [];
 							let y = Math.floor(Date.now()%8000 / 8000 * 2048);
 							if (y > 1648){
@@ -52,7 +52,7 @@
 							}
 							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y+2048, 0, 0, 0));
 							for(let i=0; i<256; i++) frame.push(new HeliosPoint(i*16, y+2048, 255-i, (i<128)?i : 256-i, (i<200)? 0:(i-200)*4));	
-							await device.sendFrame(frame, 30000);
+							device.sendFrame(frame, 30000);
 						};
 						await device.connect();
 						statusLogElm.innerHTML +=
