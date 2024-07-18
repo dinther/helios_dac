@@ -8,7 +8,7 @@ Index.html contains a demo on how to connect to the Helios Laser DAC and a sugge
 ![image](https://github.com/user-attachments/assets/f46a6c42-49b0-422e-b3e6-58a7c2fffca0)
 
 usage:
-```
+```javascript
 let heliosDevice = await connectHeliosDevice();
 heliosDevice.onFrame = async (device)=>{
     let frame = [];
