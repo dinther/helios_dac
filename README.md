@@ -10,12 +10,12 @@ Index.html contains a demo on how to connect to the Helios Laser DAC and a sugge
 usage:
 ```javascript
 let heliosDevice = await connectHeliosDevice();
-heliosDevice.onFrame = async (device)=>{
+heliosDevice.onFrame = (device)=>{
     let frame = [];
     let y = Math.floor(Date.now()%2000 / 2000 * 4095);
-    for(let i=0; i<15; i++) frame.push(new HELIOS.HeliosPoint(0, y, 0, 0, 0));
-    for(let i=0; i<256; i++) frame.push(new HELIOS.HeliosPoint(i*16, y, 255-i, i, 0));
-    await device.sendFrame(frame, 30000);
+    for(let i=0; i<15; i++) frame.push(new HELIOS.HeliosPoint(0, y, 0, 0, 0));          //  Blanking points
+    for(let i=0; i<256; i++) frame.push(new HELIOS.HeliosPoint(i*16, y, 255-i, i, 0));  //  Line
+    device.sendFrame(frame, 30000);
 };
 heliosDevice.connect();
 heliosDevice.play();
