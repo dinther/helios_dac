@@ -58,8 +58,12 @@ If that is not the case select WinUSB
 Click on the dropdown arrow of the button below and select
 "install driver" and click the button. This takes a few minutes.
 Do this for every Helios Laser DAC
+
+![image](https://github.com/user-attachments/assets/33503be4-0681-455f-b423-010080ccb1b2)
+
  
-Start and Stop doesn't work right. there is a race condition I think.
+- Start and Stop doesn't work right.
+- Disconnect has a bug.
 
 ## Live demo
 https://dinther.github.io/helios_dac/
