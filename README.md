@@ -5,7 +5,8 @@ This means that my Beatline show laser software can drive the laser directly fro
 
 Index.html contains a demo on how to connect to the Helios Laser DAC and a suggestion on how to generate dynamic content in real time.
 
-![image](https://github.com/user-attachments/assets/f46a6c42-49b0-422e-b3e6-58a7c2fffca0)
+![image](https://github.com/user-attachments/assets/54e4564c-f133-4fc2-a1df-98a825b34db1)
+
 
 usage:
 ```javascript
@@ -19,6 +20,25 @@ heliosDevice.onFrame = (device)=>{
 };
 heliosDevice.connect();
 heliosDevice.play();
+```
+
+![image](https://github.com/user-attachments/assets/0b238368-ff38-4e4f-81e3-a992daecb223)
+
+If you have multiple Helios Laser DAC's then you can also ask for a list of devices that have been given permission to connect.
+```javascript
+function connect(){
+    heliosDevices = await getHeliosDevices();
+    heliosDevices.forEach( async (device, index)=>{
+        device.onFrame = (device)=>{
+            let frame = [];
+            let y = Math.floor(Date.now()%2000 / 2000 * 4095);
+            for(let i=0; i<15; i++) frame.push(new HELIOS.HeliosPoint(0, y, 0, 0, 0));          //  Blanking points
+            for(let i=0; i<256; i++) frame.push(new HELIOS.HeliosPoint(i*16, y, 255-i, i, 0));  //  Line
+            device.sendFrame(frame, 30000);
+        }
+        device.connect();
+    });
+}
 ```
 
 Known issues:
