@@ -7,11 +7,23 @@ Index.html contains a demo on how to connect to the Helios Laser DAC and a sugge
 
 ![image](https://github.com/user-attachments/assets/f46a6c42-49b0-422e-b3e6-58a7c2fffca0)
 
+usage:
+```
+let heliosDevice = await connectHeliosDevice();
+heliosDevice.onFrame = async (device)=>{
+    let frame = [];
+    let y = Math.floor(Date.now()%2000 / 2000 * 4095);
+    for(let i=0; i<15; i++) frame.push(new HELIOS.HeliosPoint(0, y, 0, 0, 0));
+    for(let i=0; i<256; i++) frame.push(new HELIOS.HeliosPoint(i*16, y, 255-i, i, 0));
+    await device.sendFrame(PPS, FLAGS, frame, frame.length);
+};
+heliosDevice.connect();
+heliosDevice.play();
+```
 
 Known issues:
 
 Start and Stop doesn't work right. there is a race condition I think.
-Intensity field doesn't work which means no blanking either.
 
 ## Live demo
 https://dinther.github.io/helios_dac/
