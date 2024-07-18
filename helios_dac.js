@@ -56,7 +56,7 @@ export class HeliosPoint {
         this.r = r;
         this.g = g;
         this.b = b;
-        this.i = (i===undefined)? (r|g|b==0)? 0 : 255 : i;
+        this.i = (i===undefined)? (r|g|b)==0? 0 : 255 : i;
     }
 }
 
@@ -85,12 +85,14 @@ export class HeliosDevice{
     #running = false;
     #firmwareVersion;
     #name;
-    constructor(usbDevice) {
+    #pps;
+    constructor(usbDevice, pps=30000) {
         this.usbDevice = usbDevice;
         this.frameReady = false;
         this.closed = true;
         this.#firmwareVersion = 0;
         this.#name = '';
+        this.#pps = pps;
         this.onFrame = null;
         this.frameBuffer = new Uint8Array(HELIOS_MAX_POINTS * 7 + 5);
     }
@@ -137,13 +139,11 @@ export class HeliosDevice{
         if (this.closed) return HELIOS_ERROR;
         if ( points == null ||
              points.length > HELIOS_MAX_POINTS ||
-             pps > HELIOS_MAX_RATE ||
-             pps < HELIOS_MIN_RATE ||
              this.closed ||
              this.frameReady ) return HELIOS_ERROR;
 
         let bufPos = 0;
-
+        pps = (pps > 0)? Math.min(Math.max(HELIOS_MIN_RATE, pps), HELIOS_MAX_RATE) : this.#pps;
         let ppsActual = pps;
         let numOfPointsActual = points.length;
         if (((points.length - 45) % 64) === 0) {
@@ -364,6 +364,14 @@ export class HeliosDevice{
         } catch (error) {
             console.error('Error closing device:', error);
         }
+    }
+
+    get pps(){
+        return this.#pps;
+    }
+
+    set pps(value){
+        this.#pps = Math.min(Math.max(HELIOS_MIN_RATE, value), HELIOS_MAX_RATE);
     }
 
     get name(){

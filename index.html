@@ -47,7 +47,9 @@
 					heliosDevices.forEach( async (device, index)=>{
 						device.onFrame = (device)=>{
 							let frame = [];
-							let l = Date.now()%8000 / 8000;
+							let d =Date.now();
+							console.log(d);
+							let l = d%8000 / 8000;
 							let y = Math.floor(l * 2048);
 							c += 0.001;
 							if (y > 1648){
@@ -55,11 +57,10 @@
 							}
 							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y+2048, 0, 0, 0));
 							for(let i=0; i<256; i++){
-								let cf = i/128;
-								let color = hsvToRgb((cf+c)%1,1,1);
+								let color = hsvToRgb(((i/128)+c)%1,1,1);
 								frame.push(new HeliosPoint(i*16, y+2048, color[0], color[1], color[2]));
 							}	
-							device.sendFrame(frame, 30000);
+							device.sendFrame(frame, 30000, true);
 						};
 						await device.connect();
 						statusLogElm.innerHTML +=
@@ -69,6 +70,7 @@
 							' firmware version: ' + device.firmwareVersion +
 							'<br>';
 					});
+					console.log('next frame')
 					disconnectBtn.disabled = false;
 					playBtn.disabled = false;
 				} catch (error){
