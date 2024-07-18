@@ -14,14 +14,8 @@
             <div id="statusLogElm"></div>
 		</div>
 		<script type="module">           
-            import * as Helios from './helios_dac.js';
-			var HELIOS = Helios;
-			window.HELIOS = HELIOS;
+            import {HeliosPoint, connectHeliosDevice, getHeliosDevices, HeliosDevice} from './helios_dac.js';
 			const PPS = 35000;
-			const FLAGS = HELIOS.HELIOS_FLAGS_DEFAULT;
-			const MAX_GET_STATUS_RETRIES = 512;
-
-
 
 			let statusLogElm;
 			let connectBtn;
@@ -31,22 +25,21 @@
 			let heliosDacManager;
 			let frames;
 			let stopAnimation = false;
-			//let scanLine = new ScanLine(2000, 500, 5, 5);
 
-			async function getHeliosDevices(){
+			async function getHeliosDevicesUI(){
 				statusLogElm.innerHTML = '';
 				let heliosDevices = [];
 				try{
-					heliosDevices = await HELIOS.getHeliosDevices();				
+					heliosDevices = await getHeliosDevices();				
 					heliosDevices.forEach( async (device, index)=>{
 						device.onFrame = async (device)=>{
 							console.log('start onFrame');
 							let frame = [];
 							let y = Math.floor(Date.now()%2000 / 2000 * 4095);
-							for(let i=0; i<15; i++) frame.push(new HELIOS.HeliosPoint(0, y, 0, 0, 0));
-							for(let i=0; i<256; i++) frame.push(new HELIOS.HeliosPoint(i*16, y, 255-i, i, 0));
+							for(let i=0; i<15; i++) frame.push(new HeliosPoint(0, y, 0, 0, 0));
+							for(let i=0; i<256; i++) frame.push(new HeliosPoint(i*16, y, 255-i, i, 0));
 
-							await device.sendFrame(PPS, FLAGS, frame, frame.length);
+							await device.sendFrame(frame, PPS);
 							console.log('end onFrame');
 						};
 						await device.connect();
@@ -119,7 +112,7 @@
 					}
 				});
 
-				var heliosDevices = await getHeliosDevices();
+				var heliosDevices = await getHeliosDevicesUI();
 				console.log(heliosDevices);
 			});			
 		</script>
