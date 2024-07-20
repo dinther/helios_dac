@@ -48,7 +48,7 @@
 						device.onFrame = (device)=>{
 							let frame = [];
 							let d =Date.now();
-							console.log(d);
+							console.log(device.name,d);
 							let l = d%8000 / 8000;
 							let y = Math.floor(l * 2048);
 							c += 0.001;
