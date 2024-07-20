@@ -50,10 +50,6 @@ Send the same point buffer to all lasers if If you want all lasers to run perfec
             ...
 ```
 
-Known issues:
-
-Error handling is still a mess.
-
 It is possible some ports don't work. This is due to webUSB respecting permission settings in the registry.
 Run regedit and fo to the folder shown below.
 Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\USB
@@ -75,9 +71,6 @@ Make sure all your Helios Laser DAC's are is plugged in and no software is conne
 ![image](https://github.com/user-attachments/assets/33503be4-0681-455f-b423-010080ccb1b2)
 
  
-- Start and Stop doesn't work right.
-- Disconnect has a bug.
-
 ## Live demo
 https://dinther.github.io/helios_dac/
 
