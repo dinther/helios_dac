@@ -8,10 +8,8 @@
 	<body>
 		<div id="container">
 			<button id="connectBtn">Connect Helios Laser DAC</button>
-            <button id="disconnectBtn" disabled>Disconnect All</button>
-			<button id="playBtn" disabled>Play</button>
-			<button id="stopBtn" disabled>Stop</button>
-            <div id="statusLogElm"></div>
+            		<button id="disconnectBtn" disabled>Disconnect All</button>
+            		<div id="statusLogElm"></div>
 			<div id="colors"></div>
 		</div>
 		<script type="module">           
@@ -20,9 +18,7 @@
 			let statusLogElm;
 			let connectBtn;
 			let disconnectBtn;
-			let playBtn;
-			let stopBtn;
-
+			
 			function easeOutBounce(x){
 				const n1 = 7.5625;
 				const d1 = 2.75;
@@ -69,10 +65,10 @@
 							' manufacturer: ' + device.manufacturerName +
 							' firmware version: ' + device.firmwareVersion +
 							'<br>';
+						await device.start();
 					});
 					console.log('next frame')
 					disconnectBtn.disabled = false;
-					playBtn.disabled = false;
 				} catch (error){
 					console.log('getHeliosDevicesUI', error);
 				}
@@ -83,8 +79,6 @@
 				statusLogElm = document.getElementById('statusLogElm');
 				connectBtn = document.getElementById('connectBtn');
 				disconnectBtn = document.getElementById('disconnectBtn');
-				playBtn = document.getElementById('playBtn');
-				stopBtn = document.getElementById('stopBtn');
 				connectBtn.addEventListener('click', async () => {
 					try{
 						await connectHeliosDevice();
@@ -92,31 +86,6 @@
 					} catch (error){
 						console.log('connectHeliosDevice', error);
 					}
-				});
-
-				playBtn.addEventListener('click', async () => {
-					statusLogElm.innerHTML += 'Starting devices....';
-					heliosDevices.forEach( async (device, index)=>{
-						device.start();
-					});
-					statusLogElm.innerHTML += 'started<br>';
-					playBtn.disabled = true;
-					stopBtn.disabled = false;
-				});
-
-				//  Stops animation cycle
-				stopBtn.addEventListener('click', async () => {
-					try{
-						statusLogElm.innerHTML += 'Stopping devices....';
-						heliosDevices.forEach( async (device, index)=>{
-							device.stop();
-						});
-						statusLogElm.innerHTML += 'Stopped.<br>';
-						stopBtn.disabled = true;
-						playBtn.disabled = false;
-					} catch (err){
-						console.log(err);
-					}					
 				});
 				
 				disconnectBtn.addEventListener('click', async () => {
@@ -126,9 +95,7 @@
 							await heliosDevices[j].close();
 						}
 						statusLogElm.innerHTML += 'closed<br>';
-						stopBtn.disabled = true;
 						disconnectBtn.disabled = true;
-						playBtn.disabled = true;
 					} catch (err){
 						console.log(err);
 					}
